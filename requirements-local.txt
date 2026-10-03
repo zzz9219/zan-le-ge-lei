@@ -1,0 +1,10 @@
+# Compatibility tested on this Windows CPU; keep changes inside .venv.
+ctranslate2==4.4.0
+numpy==2.2.6
+onnxruntime==1.19.2
+setuptools==80.9.0
+faster-whisper==1.2.1
+playwright==1.63.0
+av==18.1.0
+huggingface-hub==1.31.0
+tokenizers==0.23.2

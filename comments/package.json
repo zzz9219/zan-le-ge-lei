@@ -1,0 +1,12 @@
+{
+  "name": "zan-le-ge-lei-comments",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "setup": "node scripts/setup-bridge.js",
+    "test": "node --test scripts/collector.test.js"
+  }
+}

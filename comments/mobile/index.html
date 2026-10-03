@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>抖音评论采集</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f3f4f6; color: #111827; }
+    body { margin: 0; min-height: 100vh; }
+    main { max-width: 620px; margin: 0 auto; padding: 22px 16px 40px; }
+    h1 { margin: 8px 0 6px; font-size: 24px; }
+    .hint { margin: 0 0 22px; color: #6b7280; line-height: 1.5; }
+    .card { background: #fff; border-radius: 16px; padding: 16px; margin: 12px 0; box-shadow: 0 2px 12px #11182712; }
+    textarea { box-sizing: border-box; width: 100%; min-height: 112px; border: 1px solid #d1d5db; border-radius: 12px; padding: 12px; font-size: 16px; line-height: 1.45; resize: vertical; }
+    button { width: 100%; border: 0; border-radius: 12px; padding: 13px; margin-top: 12px; background: #111827; color: white; font-size: 16px; font-weight: 600; }
+    button:disabled { opacity: .5; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #9ca3af; }
+    .dot.good { background: #16a34a; }
+    .dot.bad { background: #dc2626; }
+    .job { border-top: 1px solid #e5e7eb; padding: 12px 0 0; margin-top: 12px; font-size: 14px; line-height: 1.6; }
+    .video { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin-top: 10px; }
+    .video button { margin-top: 8px; background: #eef2ff; color: #3730a3; font-size: 14px; text-align: left; }
+    .comment { border-top: 1px solid #e5e7eb; padding: 12px 0; line-height: 1.55; }
+    .comment .reply { margin-left: 18px; }
+    .comment textarea, .comment input { min-height: auto; box-sizing: border-box; width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px; font-size: 14px; margin-top: 7px; }
+    .comment textarea { height: 52px; }
+    .small-button { width: auto; padding: 8px 12px; margin: 7px 0 0; font-size: 14px; }
+    .library-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .library-controls input, .library-controls select { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 9px; font-size: 15px; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 5px; background: #fee2e2; color: #b91c1c; font-size: 12px; font-weight: 700; }
+    .load-more { background: #eef2ff; color: #3730a3; }
+    .pager { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; margin-top: 10px; }
+    .pager button { margin: 0; padding: 9px 12px; }
+    .pager select { width: 100%; padding: 9px; border: 1px solid #d1d5db; border-radius: 9px; background: white; }
+    .video-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .muted { color: #6b7280; }
+    .error { color: #b91c1c; white-space: pre-wrap; }
+    .hidden { display: none; }
+    code { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>抖音评论采集</h1>
+    <p class="hint">把抖音视频链接或分享文案粘贴到这里。采集、保存和入库都在电脑本地完成。</p>
+    <section class="card">
+      <div class="status"><span id="bridgeDot" class="dot"></span><span id="bridgeText">正在检查电脑状态…</span></div>
+      <div class="muted" style="margin-top:10px">首次配置或脚本升级：点击下方按钮复制最新版脚本，在 Tampermonkey 的“抖音 Bridge”编辑器中全选、粘贴并保存。</div>
+      <button id="copyBridge" class="small-button">复制最新版桥接脚本</button>
+      <a id="bridgeScript" href="#" style="display:block;margin-top:10px">也可以打开脚本安装页</a>
+    </section>
+    <section class="card">
+      <textarea id="url" placeholder="粘贴抖音分享链接或分享文案"></textarea>
+      <button id="submit" disabled>开始采集</button>
+      <div id="message" class="job muted">每次只处理一个视频。</div>
+    </section>
+    <section class="card">
+      <strong>最近任务</strong>
+      <div id="jobs" class="muted job">暂无任务</div>
+    </section>
+    <section class="card">
+      <strong>本地知识库</strong>
+      <p class="hint">视频文案、推导主题和一级评论都保存在电脑本地。回复不在新任务中采集；可以按主题或关键词复看，并给单条评论添加备注和标签。</p>
+      <input id="libraryKeyword" placeholder="搜索主题、文案、作者或评论关键词" style="box-sizing:border-box;width:100%;padding:11px;border:1px solid #d1d5db;border-radius:10px;font-size:16px">
+      <div class="library-controls">
+        <input id="likeThreshold" type="number" min="0" step="1" value="100" aria-label="高赞门槛" placeholder="高赞门槛">
+        <select id="commentSort" aria-label="评论排序"><option value="likes">按点赞数降序</option><option value="created">按时间降序</option></select>
+      </div>
+      <label class="muted" style="display:block;margin-top:9px"><input id="highLikeOnly" type="checkbox"> 仅看高赞评论</label>
+      <label class="muted" style="display:block;margin-top:9px"><input id="reviewedOnly" type="checkbox"> 仅看已整理评论</label>
+      <div id="videoView">
+        <button id="loadLibrary" class="small-button">刷新知识库</button>
+        <button id="exportSearch" class="small-button">导出当前搜索结果（Markdown）</button>
+        <div id="videos" class="muted job">暂无已入库视频</div>
+        <div id="videoPager"></div>
+      </div>
+      <div id="commentView" class="hidden">
+        <button id="backToVideos" class="small-button">← 返回视频列表</button>
+        <div class="muted" style="margin-top:10px">“保存整理”会把标签、备注和已复看状态保存到电脑本地知识库。</div>
+        <div id="comments"></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    if (location.protocol === 'file:') {
+      location.replace('http://127.0.0.1:19423/');
+    } else {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token') || localStorage.getItem('douyinMobileToken') || '';
+    const $ = id => document.getElementById(id);
+    if (token) localStorage.setItem('douyinMobileToken', token);
+    $('bridgeScript').href = `/bridge/douyin.user.js?token=${encodeURIComponent(token)}`;
+    const headers = () => ({ 'content-type': 'application/json', 'x-access-token': token });
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
+    async function api(path, options = {}) {
+      let response;
+      try {
+        response = await fetch(path, { signal: AbortSignal.timeout(15000), ...options, headers: { ...headers(), ...(options.headers || {}) } });
+      } catch {
+        throw new Error('连接不到电脑上的采集服务，请打开电脑桌面的“抖音评论采集”快捷入口。');
+      }
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || `请求失败 ${response.status}`);
+      return body;
+    }
+    async function copyBridgeScript() {
+      const button = $('copyBridge');
+      button.disabled = true;
+      try {
+        const response = await fetch(`/bridge/douyin.user.js?token=${encodeURIComponent(token)}`);
+        if (!response.ok) throw new Error(`读取脚本失败 ${response.status}`);
+        const script = await response.text();
+        try {
+          await navigator.clipboard.writeText(script);
+        } catch {
+          const area = document.createElement('textarea');
+          area.value = script;
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.select();
+          if (!document.execCommand('copy')) throw new Error('浏览器拒绝写入剪贴板');
+          area.remove();
+        }
+        button.textContent = '已复制最新版脚本';
+      } catch (error) {
+        button.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    }
+    const libraryState = { videoId: '', rows: [], page: 1, pageSize: 10, total: 0 };
+    const videoState = { page: 1, pageSize: 5, total: 0 };
+    function renderJobs(jobs) {
+      if (!jobs.length) { $('jobs').textContent = '暂无任务'; return; }
+      $('jobs').innerHTML = jobs.map(job => {
+        const summary = job.summary || {};
+        const count = job.summary ? `一级评论 ${summary.top_comments || 0} 条，回复未采集；接口显示回复数 ${summary.reply_counts_available || 0}` : '';
+        const stop = summary.stop_reason ? `　停止原因 ${esc(summary.stop_reason)}` : '';
+        const canResume = job.status === 'partial' && summary.output_dir && summary.next_cursor !== null;
+        return `<div class="job"><b>${esc(job.status)}</b>　${count}${stop}${job.error ? `<div class="error">${esc(job.error)}</div>` : ''}${canResume ? `<button class="small-button continue-job" data-reference="${esc(job.reference)}" data-dir="${esc(summary.output_dir)}">继续采集</button>` : ''}</div>`;
+      }).join('');
+      document.querySelectorAll('.continue-job').forEach(button => button.addEventListener('click', () => {
+        startCollection(button.dataset.reference, button.dataset.dir);
+      }));
+    }
+    function renderVideos(rows, total) {
+      if (!rows.length) { $('videos').textContent = '暂无已入库视频'; $('videoPager').innerHTML = ''; return; }
+      const totalPages = Math.max(1, Math.ceil(total / videoState.pageSize));
+      $('videos').innerHTML = `<div class="muted">视频第 ${videoState.page} / ${totalPages} 页，共 ${total} 条</div>` + rows.map(video => `
+        <div class="video">
+          <div><b>${esc(video.topic || video.caption || video.aweme_id)}</b></div>
+          <div class="muted">${esc(video.author_nickname || '')}　状态 ${esc(video.last_status || '')}　一级评论 ${video.top_comments || 0} 条　回复未采集</div>
+          <div class="muted">${esc(video.caption || '')}</div>
+          ${video.last_error ? `<div class="error">${esc(video.last_error)}</div>` : ''}
+          <div class="video-actions">
+            <button class="open-video" data-video="${esc(video.aweme_id)}">查看一级评论</button>
+            <button class="export-video" data-video="${esc(video.aweme_id)}">导出 Markdown</button>
+          </div>
+        </div>`).join('');
+      document.querySelectorAll('.open-video').forEach(button => button.addEventListener('click', () => openVideo(button.dataset.video)));
+      document.querySelectorAll('.export-video').forEach(button => button.addEventListener('click', () => exportMarkdown(button.dataset.video)));
+      $('videoPager').innerHTML = `<div class="pager">
+        <button id="previousVideoPage" ${videoState.page <= 1 ? 'disabled' : ''}>上一页</button>
+        <select id="videoPageSelect" aria-label="跳转视频页码">${Array.from({ length: totalPages }, (_, index) => `<option value="${index + 1}" ${index + 1 === videoState.page ? 'selected' : ''}>第 ${index + 1} 页</option>`).join('')}</select>
+        <button id="nextVideoPage" ${videoState.page >= totalPages ? 'disabled' : ''}>下一页</button>
+      </div>`;
+      $('previousVideoPage').addEventListener('click', () => loadLibrary(videoState.page - 1));
+      $('nextVideoPage').addEventListener('click', () => loadLibrary(videoState.page + 1));
+      $('videoPageSelect').addEventListener('change', event => loadLibrary(Number(event.target.value)));
+    }
+    async function loadSettings() {
+      const result = await api('/api/settings');
+      $('likeThreshold').value = result.high_like_threshold;
+    }
+    async function saveSettings() {
+      const threshold = Number($('likeThreshold').value);
+      if (!Number.isInteger(threshold) || threshold < 0) return;
+      await api('/api/settings', { method: 'POST', body: JSON.stringify({ high_like_threshold: threshold }) });
+      if (libraryState.videoId) await loadComments(1);
+    }
+    async function loadLibrary(page = 1) {
+      try {
+        videoState.page = Math.max(1, Number(page) || 1);
+        const keyword = encodeURIComponent($('libraryKeyword').value.trim());
+        const offset = (videoState.page - 1) * videoState.pageSize;
+        const result = await api(`/api/library/videos?keyword=${keyword}&limit=${videoState.pageSize}&offset=${offset}`);
+        videoState.total = result.total || 0;
+        renderVideos(result.rows || [], result.total || 0);
+      } catch (error) { $('videos').textContent = error.message; }
+    }
+    function likesLabel(row) {
+      return Number(row.likes) < 0 ? '未知' : Number(row.likes).toLocaleString('zh-CN');
+    }
+    function renderComments(videoId) {
+      const rows = libraryState.rows;
+      const totalPages = Math.max(1, Math.ceil(libraryState.total / libraryState.pageSize));
+      const summary = `<h3>一级评论（第 ${libraryState.page} / ${totalPages} 页，共 ${libraryState.total} 条）</h3>`;
+      if (!rows.length) { $('comments').innerHTML = `${summary}<div class="muted job">这个视频暂无符合条件的一级评论。</div>`; return; }
+      $('comments').innerHTML = summary + rows.map(row => `
+        <div class="comment">
+          <div><b>${esc(row.nickname || '未知用户')}</b>：${esc(row.text)}</div>
+          <div class="muted">一级评论　赞 ${likesLabel(row)} ${row.high_like ? '<span class="badge">高赞</span>' : ''}　<span class="review-status" data-key="${esc(row.comment_key)}">${row.reviewed ? '已复看' : '未复看'}</span>　接口回复数 ${row.reply_count || 0}（未采集）</div>
+          <input class="comment-tags" data-key="${esc(row.comment_key)}" placeholder="标签，例如：选题、疑问、案例" value="${esc(row.tags)}">
+          <textarea class="comment-note" data-key="${esc(row.comment_key)}" placeholder="写一点整理备注">${esc(row.note)}</textarea>
+          <button class="small-button save-comment" data-video="${esc(videoId)}" data-key="${esc(row.comment_key)}">保存整理</button>
+        </div>`).join('') + `<div class="pager">
+          <button id="previousPage" ${libraryState.page <= 1 ? 'disabled' : ''}>上一页</button>
+          <select id="pageSelect" aria-label="跳转页码">${Array.from({ length: totalPages }, (_, index) => `<option value="${index + 1}" ${index + 1 === libraryState.page ? 'selected' : ''}>第 ${index + 1} 页</option>`).join('')}</select>
+          <button id="nextPage" ${libraryState.page >= totalPages ? 'disabled' : ''}>下一页</button>
+        </div>`;
+      document.querySelectorAll('.save-comment').forEach(button => button.addEventListener('click', async () => {
+        const key = button.dataset.key;
+        const note = document.querySelector(`.comment-note[data-key="${CSS.escape(key)}"]`).value;
+        const tags = document.querySelector(`.comment-tags[data-key="${CSS.escape(key)}"]`).value;
+        button.disabled = true;
+        try {
+          await api('/api/library/comments', { method: 'POST', body: JSON.stringify({ aweme_id: button.dataset.video, comment_key: key, reviewed: true, note, tags }) });
+          const row = libraryState.rows.find(item => item.comment_key === key);
+          if (row) { row.reviewed = 1; row.note = note; row.tags = tags; }
+          document.querySelector(`.review-status[data-key="${CSS.escape(key)}"]`).textContent = '已复看';
+          button.textContent = '已保存';
+        } catch (error) { button.textContent = error.message; }
+        button.disabled = false;
+      }));
+      $('previousPage').addEventListener('click', () => loadComments(libraryState.page - 1));
+      $('nextPage').addEventListener('click', () => loadComments(libraryState.page + 1));
+      $('pageSelect').addEventListener('change', event => loadComments(Number(event.target.value)));
+    }
+    async function loadComments(page = 1) {
+      if (!libraryState.videoId) return;
+      const targetPage = Math.max(1, Number(page) || 1);
+      $('comments').textContent = '正在读取评论…';
+      try {
+        const query = new URLSearchParams({
+          video: libraryState.videoId,
+          keyword: $('libraryKeyword').value.trim(),
+          limit: String(libraryState.pageSize),
+          offset: String((targetPage - 1) * libraryState.pageSize),
+          sort: $('commentSort').value,
+          high_like_only: $('highLikeOnly').checked ? '1' : '0',
+          reviewed_only: $('reviewedOnly').checked ? '1' : '0',
+        });
+        const result = await api(`/api/library/comments?${query}`);
+        libraryState.rows = result.rows || [];
+        libraryState.page = targetPage;
+        libraryState.total = result.total || 0;
+        renderComments(libraryState.videoId);
+        const commentTop = $('commentView').getBoundingClientRect().top + window.scrollY - 12;
+        window.scrollTo({ top: commentTop, behavior: 'auto' });
+      } catch (error) { $('comments').textContent = error.message; }
+    }
+    async function openVideo(videoId) {
+      libraryState.videoId = videoId;
+      $('videoView').classList.add('hidden');
+      $('commentView').classList.remove('hidden');
+      await loadComments(1);
+    }
+    function backToVideos() {
+      $('commentView').classList.add('hidden');
+      $('videoView').classList.remove('hidden');
+      libraryState.videoId = '';
+      const videoTop = $('videoView').getBoundingClientRect().top + window.scrollY - 12;
+      window.scrollTo({ top: videoTop, behavior: 'auto' });
+    }
+    async function exportMarkdown(videoId = '') {
+      const query = new URLSearchParams({
+        keyword: $('libraryKeyword').value.trim(),
+        sort: $('commentSort').value,
+        high_like_only: $('highLikeOnly').checked ? '1' : '0',
+        reviewed_only: $('reviewedOnly').checked ? '1' : '0',
+      });
+      if (videoId) query.set('video', videoId);
+      try {
+        const response = await fetch(`/api/library/export.md?${query}`, { headers: { 'x-access-token': token } });
+        if (!response.ok) throw new Error(await response.text());
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = videoId ? `douyin-comments-${videoId}.md` : 'douyin-comments-search.md';
+        link.click();
+        URL.revokeObjectURL(link.href);
+      } catch (error) { $('message').textContent = `导出失败：${error.message}`; }
+    }
+    async function refresh() {
+      try {
+        const status = await api('/api/status', { headers: { 'content-type': 'application/json' } });
+        $('bridgeDot').className = `dot ${!status.bridgeConnected || status.bridgeResponsive === false ? 'bad' : status.bridgeResponsive === true ? 'good' : ''}`;
+        const bridgeMessages = {
+          'old-script': '检测到旧版抖音 Bridge 脚本：请复制最新版并覆盖保存',
+          'no-browser': '电脑已启动；请打开一个已登录的 douyin.com 页面',
+          'stale-browser': '电脑已启动；抖音页面已停止响应，请回到已登录的抖音页面',
+          'server-offline': '本地 Bridge Server 尚未启动',
+          'server-error': 'Bridge Server 状态异常',
+        };
+        $('bridgeText').textContent = status.bridgeConnected
+          ? status.bridgeResponsive === true ? '抖音浏览器桥已响应；可以采集一级评论'
+            : status.bridgeResponsive === false ? '抖音页面上次回包超时；恢复页面后请主动重试'
+              : '抖音页面已登记；开始采集时检查实际响应'
+          : (bridgeMessages[status.bridgeState] || '抖音浏览器桥接尚未连接');
+        $('submit').disabled = !status.bridgeConnected || (status.jobs || []).some(job => job.status === 'running' || job.status === 'queued');
+        renderJobs(status.jobs || []);
+      } catch (error) {
+        $('bridgeDot').className = 'dot bad';
+        $('bridgeText').textContent = error.message;
+        $('submit').disabled = true;
+      }
+    }
+    async function startCollection(value, resumeDir = '') {
+      if (!value) { $('message').textContent = '请先粘贴链接'; return; }
+      $('submit').disabled = true;
+      $('message').textContent = '已提交，电脑正在采集…';
+      try {
+        const result = await api('/api/collect', { method: 'POST', body: JSON.stringify({ url: value, resume_dir: resumeDir || undefined }) });
+        $('message').textContent = `任务已开始：${result.job.id}`;
+        $('url').value = '';
+        const timer = setInterval(async () => {
+          try {
+            const current = await api(`/api/jobs/${result.job.id}`);
+            if (current.job.status === 'completed' || current.job.status === 'partial' || current.job.status === 'failed') {
+              clearInterval(timer);
+              const summary = current.job.summary || {};
+              $('message').textContent = current.job.status === 'completed'
+                ? `完成：一级评论 ${summary.top_comments || 0} 条；回复未采集`
+                : `任务未完整结束：${current.job.error || '请查看电脑上的 handoff.md'}`;
+              refresh();
+              loadLibrary();
+            }
+            refresh();
+          } catch (error) { $('message').textContent = error.message; }
+        }, 2000);
+      } catch (error) {
+        $('message').textContent = error.message;
+        refresh();
+      }
+    }
+    async function submit() {
+      const value = $('url').value.trim();
+      await startCollection(value);
+    }
+    $('submit').addEventListener('click', submit);
+    $('copyBridge').addEventListener('click', copyBridgeScript);
+    $('loadLibrary').addEventListener('click', loadLibrary);
+    $('exportSearch').addEventListener('click', () => exportMarkdown());
+    $('backToVideos').addEventListener('click', backToVideos);
+    $('likeThreshold').addEventListener('change', () => saveSettings().catch(error => { $('message').textContent = error.message; }));
+    $('commentSort').addEventListener('change', () => libraryState.videoId && loadComments(1));
+    $('highLikeOnly').addEventListener('change', () => libraryState.videoId && loadComments(1));
+    $('reviewedOnly').addEventListener('change', () => libraryState.videoId && loadComments(1));
+    refresh();
+    loadSettings().catch(error => { $('message').textContent = error.message; });
+    loadLibrary();
+    setInterval(refresh, 5000);
+    }
+  </script>
+</body>
+</html>
